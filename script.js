@@ -113,7 +113,7 @@ function speakText(text) {
   return new Promise((resolve) => {
     const synth = window.speechSynthesis;
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-GB'; // Change this if you need a different language
+    utterance.lang = 'en-GB'; 
     utterance.onend = resolve;
     synth.speak(utterance);
   });

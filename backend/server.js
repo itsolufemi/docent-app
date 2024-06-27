@@ -13,6 +13,11 @@ const openai = new OpenAI(process.env.OPENAI_API_KEY);
 const port = process.env.PORT || 3000;
 // #endregion
 
+// Ensure 'uploads' directory exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
+
 // #region To store the current thread and run ID
 let threadId = null;
 let currentRunId = null;
