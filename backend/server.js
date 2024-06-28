@@ -98,7 +98,7 @@ app.post('/cancel-run', async (req, res) => {
 const getAssistantResponse = async (inputText, res) => {
   try {
     // Retrieve the assistant
-    const assistant = await openai.beta.assistants.retrieve("asst_q9c5R2TSnZJKborszBQq24Dm");
+    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
 
     // Check if threadId is set, otherwise create a new thread
     if (!threadId) {
