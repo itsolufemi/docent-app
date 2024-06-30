@@ -1,3 +1,5 @@
+//App v.0.5.2 for heroku
+
 // #region Imports
 const express = require('express');
 const multer = require('multer');
@@ -20,7 +22,8 @@ if (!fs.existsSync('uploads')) {
 
 // #region To store the current thread and run ID
 let threadId = null;
-let currentRunId = null;
+let runId = null;
+let currentStream = null; // Store the current stream object
 // #endregion
 
 // #region Configure multer for file storage
@@ -38,11 +41,9 @@ const speechFile = path.resolve('./public/speech.mp3');
 
 app.use(express.static('public'));
 
-
 // Serve static files from the root directory
 app.use(express.static(path.join(__dirname, '..')));
-
-//#endregion
+// #endregion
 
 // Endpoint to handle audio file upload and transcription
 app.post('/upload', upload.single('audio'), async (req, res) => {
@@ -78,19 +79,17 @@ app.post('/upload', upload.single('audio'), async (req, res) => {
 
 // Endpoint to handle run cancellation
 app.post('/cancel-run', async (req, res) => {
-  const { thread_id, run_id } = req.body;
-  
-  if (!thread_id || !run_id) {
-    return res.status(400).json({ error: 'Missing thread_id or run_id' });
-  }
 
-  try {
-    const cancelResponse = await openai.beta.threads.runs.cancel(thread_id, run_id);
-    console.log('Run cancelled:', cancelResponse);
-    res.json(cancelResponse);
-  } catch (error) {
-    console.error('Error cancelling run:', error.response?.data || error.message);
-    res.status(500).send('Error cancelling run');
+  const runStatusResponse = await openai.beta.threads.runs.retrieve(threadId, runId);
+  const runStatus = runStatusResponse.status;
+
+  if (runStatus !== 'completed') {
+    //more needs to be done to resolve this logical issue
+
+    //currentStream.abort();
+    const cancelResponse = await openai.beta.threads.runs.cancel(threadId, runId);
+    console.log('Run aborted: ', cancelResponse.status);
+    return res.status(200).json({ message: 'Run aborted' });
   }
 });
 
@@ -112,39 +111,50 @@ const getAssistantResponse = async (inputText, res) => {
       content: inputText
     });
 
-    //Stream the response
-    const run = openai.beta.threads.runs.stream(threadId, {
-      assistant_id: assistant.id
+    // Create and stream the run response
+    const stream = await openai.beta.threads.runs.create(threadId, {
+      assistant_id: assistant.id,
+      stream: true
     });
-    runId = run.id;  // Save the run ID
+
+    // Store the current stream object
+    currentStream = stream;
 
     let assistantResponse = '';
     let buffer = '';
 
-    run.on('textCreated', (text) => {
-      //buffer += text;
-    });
-
-    run.on('textDelta', (textDelta) => {
-      buffer += textDelta.value;
-
-      // Stream the textDelta back to the client in real-time and the console
-      if (buffer.includes('\n\n')) { // Consider paragraph ends as chunk delimiters
-        assistantResponse += buffer;
-        process.stdout.write(buffer);
-        res.write(JSON.stringify({ type: 'textDelta', value: buffer }) + '\n');
-        buffer = '';
+    for await (const event of stream) {
+      if (event.event === 'thread.run.created') {
+        runId = event.data.id;
       }
-    });
 
-    run.on('end', () => {
-      if (buffer) {
-        assistantResponse += buffer;
-        res.write(JSON.stringify({ type: 'end', value: buffer }) + '\n');
+      if (event.event === 'thread.message.delta') {
+        const contentArray = event.data.delta.content;
+
+        if (Array.isArray(contentArray)) {
+          buffer += contentArray.map(item => item.text.value).join('');
+        }
+
+        if (buffer.includes('\n\n')) {
+          assistantResponse += buffer;
+          process.stdout.write(buffer);
+          res.write(JSON.stringify({ type: 'textDelta', value: buffer }) + '\n');
+          buffer = '';
+        }
       }
-      //console.log('\nStreaming completed. Full Assistant Response:', assistantResponse);
-      res.end(); // End the response stream
-    });
+
+      if (event.event === 'thread.run.completed') {
+        if (buffer) {
+          assistantResponse += buffer;
+          res.write(JSON.stringify({ type: 'end', value: buffer }) + '\n');
+        }
+        res.end();
+        currentStream = null;
+        break;
+      }
+    }
+
+    //console.log('Assistant Response:', assistantResponse);
 
   } catch (error) {
     console.error('Error interacting with Assistant:', error.response?.data || error.message);
