@@ -1,24 +1,22 @@
-//App v.0.5.2 for heroku
+//App v.0.6 heroku and aws s3 update for audio file management, because of heroku ephemeral filesystem
+
+require('dotenv').config();
 
 // #region Imports
 const express = require('express');
-const multer = require('multer');
-const axios = require('axios');
+const fileUpload = require('express-fileupload');
+const AWS = require('aws-sdk');
 const fs = require('fs');
 const path = require('path');
-const FormData = require('form-data');
 const { OpenAI } = require('openai');
-require('dotenv').config();
 
-const app = express();
+console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY); // Add this line for debugging
+
 const openai = new OpenAI(process.env.OPENAI_API_KEY);
+const app = express();
+
 const port = process.env.PORT || 3000;
 // #endregion
-
-// Ensure 'uploads' directory exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 // #region To store the current thread and run ID
 let threadId = null;
@@ -26,55 +24,64 @@ let runId = null;
 let currentStream = null; // Store the current stream object
 // #endregion
 
-// #region Configure multer for file storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/');
-  },
-  filename: function (req, file, cb) {
-    cb(null, 'audio.wav');
-  }
+// Configure AWS SDK
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_REGION
 });
 
-const upload = multer({ storage: storage });
-const speechFile = path.resolve('./public/speech.mp3');
-
-app.use(express.static('public'));
-
-// Serve static files from the root directory
-app.use(express.static(path.join(__dirname, '..')));
-// #endregion
-
 // Endpoint to handle audio file upload and transcription
-app.post('/upload', upload.single('audio'), async (req, res) => {
-  const filePath = path.join(__dirname, 'uploads', 'audio.wav');
-
-  try {
-    // Transcribe the audio using OpenAI's Whisper API
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath));
-    formData.append('model', 'whisper-1');
-
-    const transcriptionResponse = await axios.post('https://api.openai.com/v1/audio/transcriptions', formData, {
-      headers: {
-        ...formData.getHeaders(),
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
-      }
-    });
-
-    const transcriptionText = transcriptionResponse.data.text;
-    console.log('Transcription Text:', transcriptionText);
-
-    // Get assistant response and handle streaming
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    await getAssistantResponse(transcriptionText, res);
-
-  } catch (error) {
-    console.error('Error during transcription:', error.response?.data || error.message);
-    res.status(500).send('Error processing audio');
+app.post('/upload', (req, res) => {
+  if (!req.files || Object.keys(req.files).length === 0) {
+    return res.status(400).send('No files were uploaded.');
   }
+
+  const file = req.files.sampleFile;
+  const uploadParams = {
+    Bucket: process.env.S3_BUCKET_NAME,
+    Key: 'audio.wav',
+    Body: file.data
+  };
+
+  // Upload the file to S3
+  s3.upload(uploadParams, (err, data) => {
+    if (err) {
+      return res.status(500).send(err);
+    }
+
+    // Save the file locally to a temporary path
+    const tempFilePath = path.join(__dirname, 'temp_audio.wav');
+    fs.writeFileSync(tempFilePath, file.data);
+
+    // Transcribe the audio using Whisper API
+    async function transcribeAudio() {
+      try {
+        const transcription = await openai.audio.transcriptions.create({
+          file: fs.createReadStream(tempFilePath),
+          model: "whisper-1"
+        });
+
+        // Clean up the temporary file
+        fs.unlinkSync(tempFilePath);
+
+        // Send the transcription result
+        res.send({
+          message: 'File uploaded to S3 and transcribed successfully!',
+          transcription: transcription.text
+        });
+      } catch (transcriptionError) {
+        // Clean up the temporary file in case of error
+        fs.unlinkSync(tempFilePath);
+        res.status(500).send({
+          message: 'File uploaded to S3, but failed to transcribe.',
+          error: transcriptionError.message
+        });
+      }
+    }
+
+    transcribeAudio();
+  });
 });
 
 // Endpoint to handle run cancellation
