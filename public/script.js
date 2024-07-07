@@ -19,7 +19,7 @@ recordButton.addEventListener('click', () => {
     isPaused = false; // Reset the isPaused flag when starting a new recording
     //Reset is necessary to ensure speech synthesis after pause
 
-    navigator.mediaDevices.getUserMedia({ audio: { sampleRate: 16000, channelCount: 1 } }).then(stream => {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
       mediaRecorder = new MediaRecorder(stream);
       mediaRecorder.start();
       recordButton.innerHTML = '<i class="fas fa-stop"></i>';
