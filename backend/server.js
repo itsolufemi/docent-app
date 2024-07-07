@@ -131,6 +131,9 @@ const getAssistantResponse = async (inputText, res) => {
 
     let assistantResponse = '';
     let buffer = '';
+    
+    // Send the transcription text to the client first
+    res.write(JSON.stringify({ type: 'transcription', value: inputText }) + '\n');
 
     for await (const event of stream) {
       if (event.event === 'thread.run.created') {
@@ -162,9 +165,6 @@ const getAssistantResponse = async (inputText, res) => {
         break;
       }
     }
-
-    //console.log('Assistant Response:', assistantResponse);
-
   } catch (error) {
     console.error('Error interacting with Assistant:', error.response?.data || error.message);
     res.status(500).send('Error interacting with Assistant');

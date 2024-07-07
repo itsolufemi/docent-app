@@ -59,6 +59,9 @@ recordButton.addEventListener('click', () => {
             let lines = chunk.split('\n').filter(line => line.trim());
             for (let line of lines) {
               let parsed = JSON.parse(line);
+              if (parsed.type === 'transcription') {
+                responseElement.innerHTML += `<strong>Transcription:</strong> ${parsed.value.replace(/\n/g, '<br>')}<br>`;
+              }
               if (parsed.type === 'textDelta') {
                 responseElement.innerHTML += parsed.value.replace(/\n/g, '<br>'); // Replaces newlines with HTML line breaks
                 if (!isPaused) await speakText(parsed.value);
