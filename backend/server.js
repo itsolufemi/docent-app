@@ -1,4 +1,4 @@
-//App v.0.6 heroku w/ aws s3 update for audio file management, because of heroku ephemeral filesystem
+//App v.0.7.1 implementing open ai audio tts api, client side
 // #region Imports
 require('dotenv').config();
 const express = require('express');
@@ -15,6 +15,8 @@ const app = express();
 
 app.use(express.static(path.join(__dirname, '../public'))); // Serve static files from the 'public' directory
 app.use(fileUpload()); // Use fileUpload middleware
+app.use(express.json()); // to parse JSON bodies for the TTs endpoint.
+
 
 const port = process.env.PORT || 3000;
 
@@ -36,6 +38,7 @@ const s3 = new AWS.S3({ // Configure AWS SDK
 
 // Endpoint to handle audio file upload and transcription
 app.post('/upload', async (req, res) => {
+  isCancelled = false; //reset the cancellation flag
 
   if (!req.files || !req.files.audio) {
     console.log('No files were uploaded.'); // Debugging line
@@ -54,7 +57,7 @@ app.post('/upload', async (req, res) => {
     await s3.upload(uploadParams).promise(); // Upload the file to S3
 
     // Save the file locally to a temporary path
-    const tempFilePath = path.join(__dirname, 'temp_audio.wav');
+    const tempFilePath = path.join(__dirname, '/public/audios/temp_audio.wav');
     fs.writeFileSync(tempFilePath, file.data);
 
     // Transcribe the audio using OpenAI's Whisper API
@@ -85,20 +88,28 @@ app.post('/upload', async (req, res) => {
 });
 
 // Endpoint to handle run cancellation
-// features new logical error solving version of the pause.
+let isCancelled = false; //its not cancelled until it is cancelled... lol
+
 app.post('/cancel-run', async (req, res) => {
-  const runStatusResponse = await openai.beta.threads.runs.retrieve(threadId, runId);
-  const runStatus = runStatusResponse.status;
+  isCancelled = true; // Set the cancellation flag
+  try {
+    const runStatusResponse = await openai.beta.threads.runs.retrieve(threadId, runId);
+    const runStatus = runStatusResponse.status;
 
-  console.log('Run status:', runStatus);
-
-  if (runStatus === 'completed') {
-    res.end();
-    currentStream = null;
-  } else{
-    const cancelResponse = await openai.beta.threads.runs.cancel(threadId, runId);
-    console.log('Run aborted: ', cancelResponse.status);
-    return res.status(200).json({ message: 'Run aborted' });
+    if (runStatus === 'completed') {
+      console.log('Run already completed');
+      currentStream = null;
+      res.status(200).json({ message: 'Run already completed' });
+    } else{
+      const cancelResponse = await openai.beta.threads.runs.cancel(threadId, runId);
+      console.log('Run aborted: ', cancelResponse.status);
+      //return res.status(200).json({ message: 'Run aborted' });
+      currentStream = null;
+      res.status(200).json({ message: 'Run aborted', status: cancelResponse.status });
+    }
+  } catch (error) {
+    console.error('Error cancelling run:', error);
+    res.status(500).json({ message: 'Error cancelling run', error: error.message });
   }
 });
 
@@ -136,6 +147,14 @@ const getAssistantResponse = async (inputText, res) => {
     res.write(JSON.stringify({ type: 'transcription', value: inputText }) + '\n');
 
     for await (const event of stream) {
+      if (isCancelled) { // Check for cancellation
+        console.log('Stream cancelled by user');
+        res.write(JSON.stringify({ type: 'cancelled' }) + '\n');
+        res.end();
+        isCancelled = false; // Reset the cancellation flag
+        break;
+      }
+
       if (event.event === 'thread.run.created') {
         runId = event.data.id;
       }
@@ -148,17 +167,23 @@ const getAssistantResponse = async (inputText, res) => {
         }
 
         if (buffer.includes('\n\n')) {
+          // Call TTS endpoint with the current chunk
+          const speechurl = await generateTTS(buffer); //call the audio tts endpoint
+
           assistantResponse += buffer;
           process.stdout.write(buffer);
-          res.write(JSON.stringify({ type: 'textDelta', value: buffer }) + '\n');
+          res.write(JSON.stringify({  type: 'audio', text: buffer, value: speechurl }) + '\n');
           buffer = '';
         }
       }
 
       if (event.event === 'thread.run.completed') {
         if (buffer) {
+          // Call TTS endpoint with the end chunk
+          const speechurl = await generateTTS(buffer); //call the audio tts endpoint
+
           assistantResponse += buffer;
-          res.write(JSON.stringify({ type: 'end', value: buffer }) + '\n');
+          res.write(JSON.stringify({type: 'audio', text: buffer, value: speechurl }) + '\n');
         }
         res.end();
         currentStream = null;
@@ -170,6 +195,25 @@ const getAssistantResponse = async (inputText, res) => {
     res.status(500).send('Error interacting with Assistant');
   }
 };
+
+  // Endpoint to handle TTS requests
+  const generateTTS = async (text) => {
+    try {
+      const response = await openai.audio.speech.create({
+        model: "tts-1",
+        voice: "nova",
+        input: text
+      });
+      const bufferData = Buffer.from(await response.arrayBuffer());
+      const speechFile = `speech_${Date.now()}.mp3`;
+      const speechFilePath = path.join(__dirname, `../public/audios`, speechFile);
+      await fs.promises.writeFile(speechFilePath, bufferData);
+      return `/audios/${speechFile}`;
+    } catch (error) {
+      console.error('Error generating TTS:', error);
+      throw new Error('Error generating TTS');
+    }
+  };
 
 // Start the server
 app.listen(port, () => {
