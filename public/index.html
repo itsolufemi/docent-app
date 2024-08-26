@@ -1,3 +1,8 @@
+<!--UPDATE NOTES
+v0.8.1
+script for recorder.js api
+added hidden play button for mobile support
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,11 +15,16 @@
 <body>
     <section class="main">
         <h1>docent.ai</h1>
+        <p>v 0.8.1</p>
+        <div class="mob-btn-section hide">         
+            <button id="play-button" class="input-container-button active">
+                <i class="fa-solid fa-play"></i> <!-- Button to play audio  on mobile-->
+            </button>
+        </div>
         <div class="button-section">
             <button id="input-button" class="input-container-button">
                 <i class="fas fa-microphone"></i>
             </button>
-
             
             <button id="pause-button" class="input-container-button active hide">
                 <i class="fa-solid fa-pause"></i> <!--change to pause-->
@@ -24,5 +34,6 @@
         <p id="output"><!--displays the AI response--></p>
     </section>
     <script src="script.js"></script>
+     <script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js"></script>
 </body>
 </html>

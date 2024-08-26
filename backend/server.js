@@ -1,4 +1,8 @@
-//App v.0.7.1 implementing open ai audio tts api, client side
+//App v.0.8.1
+/*UPDATE NOTES
+  intergrating aws s3 with tts
+*/
+
 // #region Imports
 require('dotenv').config();
 const express = require('express');
@@ -92,24 +96,27 @@ let isCancelled = false; //its not cancelled until it is cancelled... lol
 
 app.post('/cancel-run', async (req, res) => {
   isCancelled = true; // Set the cancellation flag
+  if (currentStream) {
+    currentStream = null; // Nullify current stream
+  }
+
   try {
     const runStatusResponse = await openai.beta.threads.runs.retrieve(threadId, runId);
     const runStatus = runStatusResponse.status;
 
-    if (runStatus === 'completed') {
+    if (runStatus === 'completed') { //if run is already completed
       console.log('Run already completed');
-      currentStream = null;
       res.status(200).json({ message: 'Run already completed' });
     } else{
       const cancelResponse = await openai.beta.threads.runs.cancel(threadId, runId);
       console.log('Run aborted: ', cancelResponse.status);
-      //return res.status(200).json({ message: 'Run aborted' });
-      currentStream = null;
       res.status(200).json({ message: 'Run aborted', status: cancelResponse.status });
     }
   } catch (error) {
     console.error('Error cancelling run:', error);
     res.status(500).json({ message: 'Error cancelling run', error: error.message });
+  }finally {// Clean up in aisle 3
+    runId = null;
   }
 });
 
@@ -161,7 +168,6 @@ const getAssistantResponse = async (inputText, res) => {
 
       if (event.event === 'thread.message.delta') {
         const contentArray = event.data.delta.content;
-
         if (Array.isArray(contentArray)) {
           buffer += contentArray.map(item => item.text.value).join('');
         }
@@ -169,7 +175,6 @@ const getAssistantResponse = async (inputText, res) => {
         if (buffer.includes('\n\n')) {
           // Call TTS endpoint with the current chunk
           const speechurl = await generateTTS(buffer); //call the audio tts endpoint
-
           assistantResponse += buffer;
           process.stdout.write(buffer);
           res.write(JSON.stringify({  type: 'audio', text: buffer, value: speechurl }) + '\n');
@@ -178,11 +183,10 @@ const getAssistantResponse = async (inputText, res) => {
       }
 
       if (event.event === 'thread.run.completed') {
-        if (buffer) {
-          // Call TTS endpoint with the end chunk
+        if (buffer) {// Call TTS endpoint with the end chunk
           const speechurl = await generateTTS(buffer); //call the audio tts endpoint
-
           assistantResponse += buffer;
+          process.stdout.write(buffer);
           res.write(JSON.stringify({type: 'audio', text: buffer, value: speechurl }) + '\n');
         }
         res.end();
@@ -193,6 +197,7 @@ const getAssistantResponse = async (inputText, res) => {
   } catch (error) {
     console.error('Error interacting with Assistant:', error.response?.data || error.message);
     res.status(500).send('Error interacting with Assistant');
+    res.write(JSON.stringify({ type: 'cancelled' }) + '\n');
   }
 };
 
@@ -206,9 +211,31 @@ const getAssistantResponse = async (inputText, res) => {
       });
       const bufferData = Buffer.from(await response.arrayBuffer());
       const speechFile = `speech_${Date.now()}.mp3`;
-      const speechFilePath = path.join(__dirname, `../public/audios`, speechFile);
-      await fs.promises.writeFile(speechFilePath, bufferData);
-      return `/audios/${speechFile}`;
+     
+    const uploadParams = { // upload parameters for S3
+      Bucket: process.env.S3_BUCKET_NAME, // Your S3 bucket name
+      Key: speechFile, // File name to save as in S3
+      Body: bufferData,
+      ContentType: 'audio/mpeg'
+    };   
+
+    await s3.upload(uploadParams).promise();
+
+    // Generate a signed URL
+    const signedUrlParams = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: speechFile,
+      Expires: 86400 // 24 hours
+    };
+    const signedUrl = s3.getSignedUrl('getObject', signedUrlParams);
+
+    if(isCancelled) {
+      console.log('no tts generated: cancelled');
+      return null;
+    } else {  
+    console.log(`File uploaded successfully. Access it here for the next 24 hours: ${signedUrl}`);
+    return signedUrl;
+    }
     } catch (error) {
       console.error('Error generating TTS:', error);
       throw new Error('Error generating TTS');
