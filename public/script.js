@@ -3,9 +3,11 @@
   pause bug fix
   updated to recorder.js api
   new play button for mobile (to circumvent autoplay restrictions)
+  fixed the mobile audio after pause feature
 */  
 
 // #region setup
+const device = document.getElementById("device");
 const play_sect = document.getElementsByClassName("mob-btn-section")[0];
 const reg_sec = document.getElementsByClassName("button-section")[0];
 const playButton = document.getElementById('play-button');
@@ -26,6 +28,12 @@ const isMobile = isMobileDevice(); // Check if the user is on a mobile device at
 function isMobileDevice() { // Check if the user is using a mobile device
   const userAgent = navigator.userAgent.toLowerCase();
   return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
+}
+
+if(isMobile) {
+  device.innerHTML = "Mobile";
+} else {
+  device.innerHTML = "Desktop";
 }
 
 recordButton.addEventListener('click', () => {
@@ -139,6 +147,7 @@ function toggle_btn() {
 pauseButton.addEventListener('click', async () => {
   asst_speaking = false; // Set the speaking flag to false to stop playback
   audioQueue = []; // Clear the audio queue
+  audio_triggerred = false; // Reset audio trigger flag
   stopAudio(); // Stop the current audio
 
   try {
@@ -220,6 +229,7 @@ function end_res() {
     asst_speaking: ${asst_speaking} 
     currentAudio: ${currentAudio}
     audioQueue: ${audioQueue}
+    audio_triggerred: ${audio_triggerred}
    `);
   return;
 }
