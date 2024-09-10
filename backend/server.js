@@ -1,6 +1,6 @@
-//App v.0.8.1
+//App v.0.9
 /*UPDATE NOTES
-  intergrating aws s3 with tts
+  tour functionality
 */
 
 // #region Imports
@@ -30,6 +30,13 @@ app.get('/', (req, res) => { // Define a route for the root URL
 
 // #region To store the current thread and run ID
 let threadId = null;
+async function create_thread() { //create the thread at the beginning of the server run
+  const thread = await openai.beta.threads.create();
+  threadId = thread.id;
+}
+
+create_thread();
+
 let runId = null;
 let currentStream = null; // Store the current stream object
 // #endregion
@@ -120,6 +127,54 @@ app.post('/cancel-run', async (req, res) => {
   }
 });
 
+
+// Endpoint to curate a tour
+app.post('/tour', async (req, res) => {
+  console.log(threadId);
+
+  try {
+    // Retrieve the assistant
+    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
+    
+    // ask the assistant to curate a tour
+    await openai.beta.threads.messages.create(threadId, {
+      role: "user",
+      content: "curate a tour of 5 highlight paintings here at the gallery"
+      //, just list the paintings, i'll tell you when i'm ready to hear you talk about them, ensure to include the room numbers for each painting and politely ask the user to head to the room for the first painting
+    });
+
+    const run = await openai.beta.threads.runs.createAndPoll( //create a new run
+      threadId,{ assistant_id: assistant.id
+    });
+
+    let curated_tour = '';
+    if (run.status === 'completed') {//load the last response in the thread
+      const messages = await openai.beta.threads.messages.list(run.thread_id);
+      const lastMessage = messages.data.find(message => message.role === 'assistant');
+      curated_tour = lastMessage.content[0].text.value;
+    } else {
+      return 'Assistant response not completed';
+    }
+
+    console.log('curated tour:', curated_tour);
+
+    if (curated_tour.length > 0) {//pass the entire response to the TTS endpoint
+      const speech_url = await generateTTS(curated_tour);
+      res.json({
+        type: 'audio',
+        text: curated_tour,
+        value: speech_url, // S3 URL returned from generateTTS
+      });
+    } else {// handles empty response
+      console.log('curator provided an empty response.');
+      res.json({ type: 'text', text: 'The curator did not provide a response.' });
+    }
+  } catch (error) {
+    console.error('Error interacting with curator:', error.response?.data || error.message);
+    res.status(500).send('Error interacting with curator');
+  }
+});
+
 // Function to interact with the Assistant
 const getAssistantResponse = async (inputText, res) => {
   try {
@@ -127,10 +182,12 @@ const getAssistantResponse = async (inputText, res) => {
     const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
 
     // Check if threadId is set, otherwise create a new thread
+    /*
     if (!threadId) {
       const thread = await openai.beta.threads.create();
       threadId = thread.id;
     }
+    */
 
     // Create the message in the existing thread
     await openai.beta.threads.messages.create(threadId, {

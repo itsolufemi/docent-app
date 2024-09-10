@@ -1,12 +1,12 @@
-// App v.0.8.1
+// App v.0.9
 /*UPDATE NOTES
-  pause bug fix
-  updated to recorder.js api
-  new play button for mobile (to circumvent autoplay restrictions)
-  fixed the mobile audio after pause feature
+  tour functionality
 */  
 
 // #region setup
+const tour_btn = document.getElementById('tour-btn');
+const tour_text = document.getElementById('tour-text');
+const tour_panel = document.getElementsByClassName('tour-sec');
 const device = document.getElementById("device");
 const play_sect = document.getElementsByClassName("mob-btn-section")[0];
 const reg_sec = document.getElementsByClassName("button-section")[0];
@@ -35,6 +35,36 @@ if(isMobile) {
 } else {
   device.innerHTML = "Desktop";
 }
+
+// #region tour feature
+tour_btn.addEventListener('click', async () => {
+  try {
+    const cur_tour = await fetch('/tour', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!cur_tour.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const result = await cur_tour.json();
+    tour_text.innerHTML = result.text;
+    if(isMobile){
+      mob_queueAudio(result.value); //queue each new audio chunk
+      mob_compat();
+    }  else {
+      queueAudio(result.value); //autoplay assistant response
+    }
+  } catch (error) {
+    console.error('Error starting tour:', error);
+  }
+});
+
+// #endregion
+
 
 recordButton.addEventListener('click', () => {
   if (recorder && recorder.recording) {
