@@ -139,8 +139,7 @@ app.post('/tour', async (req, res) => {
     // ask the assistant to curate a tour
     await openai.beta.threads.messages.create(threadId, {
       role: "user",
-      content: "curate a tour of 5 highlight paintings here at the gallery"
-      //, just list the paintings, i'll tell you when i'm ready to hear you talk about them, ensure to include the room numbers for each painting and politely ask the user to head to the room for the first painting
+      content: "explain to the user that you've prepared a tour of paintings in the gallery's highlight collection. return a list of paintings with the corresponding room number for each painting, using only sequence transition words to list the paintings instead of a numbered list. Ask the user to proceed to the appropriate room of the first painting to begin the tour. Remind the user that they can ask for directions to rooms from the staff around the gallery and ask the user to let you know when they are ready to begin"
     });
 
     const run = await openai.beta.threads.runs.createAndPoll( //create a new run
