@@ -25,6 +25,8 @@ let currentAudio = null;	// tracks current audio chunk being played
 const isMobile = isMobileDevice(); // Check if the user is on a mobile device at the start
 // #endregion
 
+intro();
+
 function isMobileDevice() { // Check if the user is using a mobile device
   const userAgent = navigator.userAgent.toLowerCase();
   return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
@@ -35,6 +37,35 @@ if(isMobile) {
 } else {
   device.innerHTML = "Desktop";
 }
+
+// #region introduction
+async function intro(){
+  console.log("introduction");
+  try {
+    const intro = await fetch('/introduction', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+    if (!intro.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const result = await intro.json();
+    responseElement.innerHTML = result.text;
+    if(isMobile){
+      mob_queueAudio(result.value); //queue each new audio chunk
+      mob_compat();
+    }  else {
+      queueAudio(result.value); //autoplay assistant response
+    }
+  } catch (error) {
+    console.error('Error starting intro:', error);
+  };
+}
+
+// #endregion
 
 // #region tour feature
 tour_btn.addEventListener('click', async () => {

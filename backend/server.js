@@ -47,6 +47,51 @@ const s3 = new AWS.S3({ // Configure AWS SDK
   region: process.env.AWS_REGION
 });
 
+// Endpoint to handle user welcome message
+app.post('/introduction', async (req, res) => {
+  try {
+    //Retrieve the assistant
+    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
+
+    await openai.beta.threads.messages.create(threadId, {
+      role: 'user',
+      content: "welcome the user to the gallery, ask if there is anything in partiular they want to see, inform them that its fine if they dont know, thats why you're here to help, if they want to you put together a small tour for them or, they can walk around see if anything catches their eye and you'll get started there"
+      //this to be generated later
+    });
+
+    const run = await openai.beta.threads.runs.createAndPoll( //create a new run
+      threadId,{ assistant_id: assistant.id
+    });
+
+    let intro = '';
+    if (run.status === 'completed') {//load the last response in the thread
+      const messages = await openai.beta.threads.messages.list(run.thread_id);
+      const lastMessage = messages.data.find(message => message.role === 'assistant');
+      intro = lastMessage.content[0].text.value;
+    } else {
+      return 'Assistant welcome message not completed';
+    }
+
+    console.log('message:', intro);
+
+    if (intro.length > 0) {//pass the entire response to the TTS endpoint
+      const speech_url = await generateTTS(intro);
+      res.json({
+        type: 'audio',
+        text: intro,
+        value: speech_url, // S3 URL returned from generateTTS
+      });
+    } else {// handles empty response
+      console.log('intro provided an empty response.');
+      res.json({ type: 'text', text: 'no intro available' });
+    }
+  } catch (error) {
+    console.error('Error with introduction:', error.response?.data || error.message);
+    res.status(500).send('Error with introduction');
+  }
+});
+
+
 // Endpoint to handle audio file upload and transcription
 app.post('/upload', async (req, res) => {
   isCancelled = false; //reset the cancellation flag
@@ -100,7 +145,6 @@ app.post('/upload', async (req, res) => {
 
 // Endpoint to handle run cancellation
 let isCancelled = false; //its not cancelled until it is cancelled... lol
-
 app.post('/cancel-run', async (req, res) => {
   isCancelled = true; // Set the cancellation flag
   if (currentStream) {
@@ -152,7 +196,7 @@ app.post('/tour', async (req, res) => {
       const lastMessage = messages.data.find(message => message.role === 'assistant');
       curated_tour = lastMessage.content[0].text.value;
     } else {
-      return 'Assistant response not completed';
+      return 'Assistant response for tour not completed';
     }
 
     console.log('curated tour:', curated_tour);
@@ -179,14 +223,6 @@ const getAssistantResponse = async (inputText, res) => {
   try {
     // Retrieve the assistant
     const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
-
-    // Check if threadId is set, otherwise create a new thread
-    /*
-    if (!threadId) {
-      const thread = await openai.beta.threads.create();
-      threadId = thread.id;
-    }
-    */
 
     // Create the message in the existing thread
     await openai.beta.threads.messages.create(threadId, {
