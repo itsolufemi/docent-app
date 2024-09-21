@@ -1,6 +1,6 @@
 // App v.1.0
 /*UPDATE NOTES
-  
+using the start button to initilize audio context negates the need for the play button on mobile for assistant audio response  
 */  
 
 // #region setup
@@ -56,6 +56,11 @@ if(isMobile) {
 start_btn.addEventListener('click', () => {
   index.classList.add('hide'); //hide the index
   app.classList.remove('hide'); //show the app
+
+  if (!audioContext) { //use the click on start as sufficient interation to initialize audio context
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
   intro();
   show_text(); //show intro message transcription
 });
@@ -293,12 +298,7 @@ function mob_compat() { //mobile compatibility autoplay circumvent
 }
 
 function start_audio(x) { //play assistant response
-  if(isMobile){
-    mob_queueAudio(x); //queue each new audio chunk
-    mob_compat();
-  }  else {
-    queueAudio(x); //autoplay assistant response
-  }
+  queueAudio(x); //autoplay assistant response
 }
 
 function stopAudio() {
@@ -365,31 +365,3 @@ function end_res() { // at the end of the assistant audio response
   return;
 } 
 // #endregion
-
-/* #regionold  tour feature
-tour_btn.addEventListener('click', async () => {
-  try {
-    const cur_tour = await fetch('/tour', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-
-    if (!cur_tour.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const result = await cur_tour.json();
-    tour_text.innerHTML = result.text;
-    if(isMobile){
-      mob_queueAudio(result.value); //queue each new audio chunk
-      mob_compat();
-    }  else {
-      queueAudio(result.value); //autoplay assistant response
-    }
-  } catch (error) {
-    console.error('Error starting tour:', error);
-  }
-});
-// #endregion */
