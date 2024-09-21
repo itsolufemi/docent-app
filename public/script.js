@@ -211,6 +211,7 @@ pauseButton.addEventListener('click', async () => {
 tour_btn.addEventListener('click', async () => { //the tour button
   if(!tour_req) { //load tour
     tour_req = true; //confirm tour requested flag
+    show_tour(); //show the tour text
     tour_text.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>'; //loading ...
 
     // #region tour endpoint request
@@ -228,8 +229,8 @@ tour_btn.addEventListener('click', async () => { //the tour button
       }
       const tour_res = await cur_tour.json();
       tour_text.innerHTML = tour_res.text;
+      show_tour(); //just in case user is viewing another screen, it shows when the tour is ready to play
       start_audio(tour_res.value); //start playing the tour message
-      show_tour(); //show the tour text
     } catch (error) {
       console.error('Error starting tour:', error);
     }

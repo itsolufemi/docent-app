@@ -1,6 +1,6 @@
 //App v.1.0
 /*UPDATE NOTES
-  
+retriving the assistant and creating the thread at the beginning of the code
 */
 
 // #region Imports
@@ -21,25 +21,24 @@ app.use(express.static(path.join(__dirname, '../public'))); // Serve static file
 app.use(fileUpload()); // Use fileUpload middleware
 app.use(express.json()); // to parse JSON bodies for the TTs endpoint.
 
-
 const port = process.env.PORT || 3000;
-
 app.get('/', (req, res) => { // Define a route for the root URL
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// #region To store the current thread and run ID
-let threadId = null;
-async function create_thread() { //create the thread at the beginning of the server run
-  const thread = await openai.beta.threads.create();
-  threadId = thread.id;
+//#region assistant's global variables
+let assistant = null; // retrieved assistant
+let threadId = null; //threadId 
+let runId = null; // Store the current run ID
+let currentStream = null; // Store the current stream object
+async function create_thread_and_assistant() { //create the assistant and thread at the beginning of the server run
+  assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS"); //Retrieve the assistant at the top
+  const thread = await openai.beta.threads.create(); //create overall thread
+  threadId = thread.id; //set the threadId
 }
 
-create_thread();
-
-let runId = null;
-let currentStream = null; // Store the current stream object
-// #endregion
+create_thread_and_assistant();
+//#endregion
 
 const s3 = new AWS.S3({ // Configure AWS SDK
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -49,10 +48,7 @@ const s3 = new AWS.S3({ // Configure AWS SDK
 
 // Endpoint to handle user welcome message
 app.post('/introduction', async (req, res) => {
-  try {
-    //Retrieve the assistant
-    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
-
+  try { //introductory message
     await openai.beta.threads.messages.create(threadId, {
       role: 'user',
       content: "welcome the user to the gallery, ask if there is anything in partiular they want to see, inform them that its fine if they dont know, thats why you're here to help, if they want to you put together a small tour for them or, they can walk around see if anything catches their eye and you'll get started there"
@@ -173,13 +169,7 @@ app.post('/cancel-run', async (req, res) => {
 
 // Endpoint to curate a tour
 app.post('/tour', async (req, res) => {
-  console.log(threadId);
-
-  try {
-    // Retrieve the assistant
-    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
-    
-    // ask the assistant to curate a tour
+  try { // ask the assistant to curate a tour
     await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: "explain to the user that you've prepared a tour of paintings in the gallery's highlight collection. return a list of paintings with the corresponding room number for each painting, using only sequence transition words to list the paintings instead of a numbered list. Ask the user to proceed to the appropriate room of the first painting to begin the tour. Remind the user that they can ask for directions to rooms from the staff around the gallery and ask the user to let you know when they are ready to begin"
@@ -219,11 +209,7 @@ app.post('/tour', async (req, res) => {
 
 // Function to interact with the Assistant
 const getAssistantResponse = async (inputText, res) => {
-  try {
-    // Retrieve the assistant
-    const assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS");
-
-    // Create the message in the existing thread
+  try {// Create the message in the existing thread
     await openai.beta.threads.messages.create(threadId, {
       role: "user",
       content: inputText
