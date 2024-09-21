@@ -1,8 +1,7 @@
 <!--UPDATE NOTES
-v0.8.1
-script for recorder.js api
-added hidden play button for mobile support
-added device indicator
+v0.1.0
+new ui
+start option
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -14,32 +13,60 @@ added device indicator
     <title>docent.ai</title>
 </head>
 <body>
-    <section class="main">
-        <h1>docent.ai</h1>
-        <p id ="device"></p>
-        <p>v 0.8.1</p>
-        <button id="tour-btn">take a tour</button>       
-        <div class="tour-sec">
-            <p id="tour-text"></p>
-        </div>
-        <div class="mob-btn-section hide">         
-            <button id="play-button" class="input-container-button active">
-                <i class="fa-solid fa-play"></i> <!-- Button to play audio  on mobile-->
-            </button>
-        </div>
-        <div class="button-section">
-            <button id="input-button" class="input-container-button">
-                <i class="fas fa-microphone"></i>
-            </button>
-            
-            <button id="pause-button" class="input-container-button active hide">
-                <i class="fa-solid fa-pause"></i> <!--change to pause-->
-            </button>
-        </div>
-        <audio id="audio" class="hide" controls></audio>
-        <p id="output"><!--displays the AI response--></p>
+    <section id="index"> <!--start screen-->
+        <section class="main">
+            <span id ="device"> v 0.8.1</span>
+            <h3>docent.ai</h3>
+        </section>
+
+        <section id="start" class="footer">
+            <button id="start" ><i class="fa-solid fa-play"></i></button>
+        </section>
     </section>
+
+    <section id="app" class="hide"> <!-- main app -->
+        <section class="main">
+            <span id ="device"> v 0.8.1</span>
+            <h3>docent.ai</h3>
+        
+            <!--region big mic button at the top-->
+            <div class ="top">
+                <div class="mob-btn-section hide">         
+                    <button id="play-button" class="input-container-button active">
+                        <i class="fa-solid fa-play"></i> <!-- Button to play audio  on mobile-->
+                    </button>
+                </div>
+                <div class="button-section"> 
+                    <button id="input-button" class="input-container-button">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    
+                    <button id="pause-button" class="input-container-button active hide">
+                        <i class="fa-solid fa-pause"></i> <!--change to pause-->
+                    </button>
+                </div>
+                <audio id="audio" class="hide" controls></audio>
+            </div>
+            <!--endregion-->
+
+            <nav id="nav">
+                <button id="tour-btn" class="nav-btn">tour</button>
+                <button id="scan-btn" class="nav-btn">scan</button>     
+                <button id="transcript-btn" class="nav-btn">text</button>           
+            </nav>
+
+            <div id="text-panel" class="text-panel">
+                <p id="tour-text" class="hide"><!--display the list of paintings in the tour--></p> 
+                <p id="output" class="hide"><!--displays the AI response--></p>
+            </div>
+        </section>
+
+        <section id="close" class="footer">
+            <button id="close"><i class="fa-solid fa-power-off"></i></button>
+        </section>
+    </section>
+
     <script src="script.js"></script>
-     <script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js"></script>
 </body>
 </html>

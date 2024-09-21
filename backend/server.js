@@ -1,6 +1,6 @@
-//App v.0.9
+//App v.1.0
 /*UPDATE NOTES
-  tour functionality
+  
 */
 
 // #region Imports
@@ -90,7 +90,6 @@ app.post('/introduction', async (req, res) => {
     res.status(500).send('Error with introduction');
   }
 });
-
 
 // Endpoint to handle audio file upload and transcription
 app.post('/upload', async (req, res) => {
@@ -293,7 +292,7 @@ const getAssistantResponse = async (inputText, res) => {
   }
 };
 
-  // Endpoint to handle TTS requests
+// Endpoint to handle TTS requests
   const generateTTS = async (text) => {
     try {
       const response = await openai.audio.speech.create({

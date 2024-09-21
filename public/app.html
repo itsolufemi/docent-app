@@ -1,0 +1,56 @@
+<!--UPDATE NOTES
+v0.1.0
+new ui
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <title>docent.ai</title>
+</head>
+<body>
+    <section class="main">
+        <span id ="device"> v 0.8.1</span>
+        <h3>docent.ai</h3>
+       
+        <!--region big mic button at the top-->
+        <div class ="top">
+            <div class="mob-btn-section hide">         
+                <button id="play-button" class="input-container-button active">
+                    <i class="fa-solid fa-play"></i> <!-- Button to play audio  on mobile-->
+                </button>
+            </div>
+            <div class="button-section"> 
+                <button id="input-button" class="input-container-button">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                
+                <button id="pause-button" class="input-container-button active hide">
+                    <i class="fa-solid fa-pause"></i> <!--change to pause-->
+                </button>
+            </div>
+            <audio id="audio" class="hide" controls></audio>
+        </div>
+        <!--endregion-->
+
+        <nav id="nav">
+            <button id="tour-btn" class="nav-btn">tour</button>
+            <button id="scan-btn" class="nav-btn">scan</button>     
+            <button id="transcript-btn" class="nav-btn">text</button>           
+        </nav>
+
+        <div id="text-panel" class="text-panel">
+            <p id="tour-text" class="hide">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p> <!--display the list of paintings in the tour-->
+            <p id="output" class="hide">Lorem ipsum dolor sit amet, consectetur adipiscing eli<!--displays the AI response--></p>
+        </div>
+    </section>
+    <section class="footer">
+        <button id="close"><i class="fa-solid fa-power-off"></i></button>
+    </section>
+    <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/recorderjs/0.1.0/recorder.js"></script>
+</body>
+</html>

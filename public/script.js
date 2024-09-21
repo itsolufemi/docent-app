@@ -1,19 +1,33 @@
-// App v.0.9
+// App v.1.0
 /*UPDATE NOTES
-  tour functionality
+  
 */  
 
 // #region setup
-const tour_btn = document.getElementById('tour-btn');
-const tour_text = document.getElementById('tour-text');
-const tour_panel = document.getElementsByClassName('tour-sec');
 const device = document.getElementById("device");
-const play_sect = document.getElementsByClassName("mob-btn-section")[0];
+const version = "1.0.0";
+
+const start_btn = document.getElementById('start');
+const index = document.getElementById('index');
+const close_btn = document.getElementById('close');
+const app = document.getElementById('app');
+
 const reg_sec = document.getElementsByClassName("button-section")[0];
-const playButton = document.getElementById('play-button');
 const recordButton = document.getElementById('input-button');
+const playButton = document.getElementById('play-button');
 const pauseButton = document.getElementById('pause-button');
+const play_sect = document.getElementsByClassName("mob-btn-section")[0];
+
+const tour_btn = document.getElementById('tour-btn');
+const scan_btn = document.getElementById('scan-btn');
+const transcript_btn = document.getElementById('transcript-btn');
+let tour_req = false;
+let tour_is_selected = false;
+let txt_is_selected = false;
+
+const tour_text = document.getElementById('tour-text');
 const responseElement = document.getElementById('output');
+
 const audioElement = document.getElementById('audio');
 let audioContext;
 let recorder;
@@ -25,22 +39,37 @@ let currentAudio = null;	// tracks current audio chunk being played
 const isMobile = isMobileDevice(); // Check if the user is on a mobile device at the start
 // #endregion
 
-intro();
-
+// #region 1. Check device type
 function isMobileDevice() { // Check if the user is using a mobile device
   const userAgent = navigator.userAgent.toLowerCase();
   return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
 }
 
 if(isMobile) {
-  device.innerHTML = "Mobile";
+  device.innerHTML = "mobile" + " v." + version;
 } else {
-  device.innerHTML = "Desktop";
+  device.innerHTML = "desktop" + " v." + version;
 }
+// #endregion
 
-// #region introduction
+// #region 1. start/close
+start_btn.addEventListener('click', () => {
+  index.classList.add('hide'); //hide the index
+  app.classList.remove('hide'); //show the app
+  intro();
+  show_text(); //show intro message transcription
+});
+
+close_btn.addEventListener('click', () => {
+  app.classList.add('hide'); //hide the app
+  index.classList.remove('hide'); //show the index
+});
+// #endregion
+
+// #region 3. intro function
 async function intro(){
   console.log("introduction");
+  responseElement.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>';
   try {
     const intro = await fetch('/introduction', {
       method: 'POST',
@@ -52,56 +81,24 @@ async function intro(){
     if (!intro.ok) {
       throw new Error('Network response was not ok');
     }
-    const result = await intro.json();
-    responseElement.innerHTML = result.text;
-    if(isMobile){
-      mob_queueAudio(result.value); //queue each new audio chunk
-      mob_compat();
-    }  else {
-      queueAudio(result.value); //autoplay assistant response
-    }
+    const intro_res = await intro.json();
+    responseElement.innerHTML = intro_res.text; // load intro text
+    start_audio(intro_res.value); //start the intro message
   } catch (error) {
     console.error('Error starting intro:', error);
   };
 }
-
 // #endregion
 
-// #region tour feature
-tour_btn.addEventListener('click', async () => {
-  try {
-    const cur_tour = await fetch('/tour', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-
-    if (!cur_tour.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const result = await cur_tour.json();
-    tour_text.innerHTML = result.text;
-    if(isMobile){
-      mob_queueAudio(result.value); //queue each new audio chunk
-      mob_compat();
-    }  else {
-      queueAudio(result.value); //autoplay assistant response
-    }
-  } catch (error) {
-    console.error('Error starting tour:', error);
-  }
-});
-
-// #endregion
-
-
+// #region 4. mic button functions
 recordButton.addEventListener('click', () => {
   if (recorder && recorder.recording) {
     recorder.stop(); // Stop the recording
     recordButton.innerHTML = '<i class="fas fa-microphone"></i>';
     recordButton.classList.remove('active');
+
+    show_text(); //show the transcripts panel
+    responseElement.innerHTML = '<i class="fas fa-microphone"></i>';
     
     recorder.exportWAV(async (blob) => {
       const audioUrl = URL.createObjectURL(blob);
@@ -138,16 +135,11 @@ recordButton.addEventListener('click', () => {
           for (let line of lines) {
             let parsed = JSON.parse(line);
             if (parsed.type === 'transcription') {
-              responseElement.innerHTML += `<strong>Transcription:</strong> ${parsed.value.replace(/\n/g, '<br>')}<br>`;
+              responseElement.innerHTML = `<strong>Transcription:</strong> ${parsed.value.replace(/\n/g, '<br>')}<br>`;
             }
             if (parsed.type === 'audio') {
               responseElement.innerHTML += parsed.text.replace(/\n/g, '<br>');
-              if(isMobile){
-                mob_queueAudio(parsed.value); //queue each new audio chunk
-                mob_compat();
-              }  else {
-                queueAudio(parsed.value); //autoplay assistant response
-              }
+              start_audio(parsed.value);
             }
             if (parsed.type === 'cancelled') {
               responseElement.innerHTML = 'Cancelled.';
@@ -177,22 +169,6 @@ recordButton.addEventListener('click', () => {
     });
   }
 });
-
-// #region mobile compatibility autoplay circumvent
-function mob_compat() {
-  if (!audio_triggerred){
-    console.log("mobile device");
-    play_sect.classList.remove('hide'); // Show play button section
-    reg_sec.classList.add('hide');  // Hide regular button section 
-    playButton.onclick = () => {
-      audio_triggerred = true;
-      play_sect.classList.add('hide'); // Hide play button section
-      reg_sec.classList.remove('hide'); // Show regular button section
-      playNextAudio(); // Ensure that all queued audios play sequent
-    }
-  };
-}
-// #endregion
 
 function toggle_btn() {
   console.log("buttons have switched");
@@ -229,6 +205,100 @@ pauseButton.addEventListener('click', async () => {
     console.error('Error cancelling run:', error);
   }
 });
+// #endregion
+
+// #region 5. menu buttons functions
+tour_btn.addEventListener('click', async () => { //the tour button
+  if(!tour_req) { //load tour
+    tour_req = true; //confirm tour requested flag
+    tour_text.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>'; //loading ...
+
+    // #region tour endpoint request
+    try {
+      const cur_tour = await fetch('/tour', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      });
+  
+      if (!cur_tour.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const tour_res = await cur_tour.json();
+      tour_text.innerHTML = tour_res.text;
+      start_audio(tour_res.value); //start playing the tour message
+      show_tour(); //show the tour text
+    } catch (error) {
+      console.error('Error starting tour:', error);
+    }
+    // #endregion
+  }
+
+  if (!tour_is_selected) { //show tour text
+    tour_is_selected = true;
+    show_tour();
+  } else {
+    tour_is_selected = false;
+    tour_btn.classList.remove('selected'); //remove the tour btn  selected flag
+    tour_text.classList.add('hide'); //hide the tour text
+  }
+});
+
+transcript_btn.addEventListener('click', () => { //the transcript button
+  if (!txt_is_selected) {
+    txt_is_selected = true;
+    show_text();
+  } else {
+    txt_is_selected = false;
+    transcript_btn.classList.remove('selected'); //remove the trans btn selected flag 
+    responseElement.classList.add('hide'); //hide the transcription
+  }
+});
+// #endregion
+
+// #region 6. text functions
+function show_text() {
+  transcript_btn.classList.add('selected'); //change the button to selected
+  responseElement.classList.remove('hide'); //show the transcription
+  tour_btn.classList.remove('selected'); //remove the tour btn  selected flag
+  tour_text.classList.add('hide'); //hide the tour text
+  tour_is_selected = false; //negate tour option
+}
+
+function show_tour() {
+  tour_btn.classList.add('selected'); //change the button to selected
+  tour_text.classList.remove('hide'); //show the tour text
+  transcript_btn.classList.remove('selected'); //remove the trans btn selected flag
+  responseElement.classList.add('hide'); //hide the transcription
+  txt_is_selected = false; //negate transcript option
+}
+// #endregion
+
+// #region audio  functions
+function mob_compat() { //mobile compatibility autoplay circumvent
+  if (!audio_triggerred){
+    console.log("mobile device");
+    play_sect.classList.remove('hide'); // Show play button section
+    reg_sec.classList.add('hide');  // Hide regular button section 
+    playButton.onclick = () => {
+      audio_triggerred = true;
+      play_sect.classList.add('hide'); // Hide play button section
+      reg_sec.classList.remove('hide'); // Show regular button section
+      playNextAudio(); // Ensure that all queued audios play sequent
+    }
+  };
+}
+
+function start_audio(x) { //play assistant response
+  if(isMobile){
+    mob_queueAudio(x); //queue each new audio chunk
+    mob_compat();
+  }  else {
+    queueAudio(x); //autoplay assistant response
+  }
+}
 
 function stopAudio() {
   if (currentAudio) {
@@ -237,21 +307,20 @@ function stopAudio() {
   }
     isPlaying = false;
     end_res();
-
 }
 
-function queueAudio(audioUrl) {
+function queueAudio(audioUrl) { //add all the audio to the queue
   audioQueue.push(audioUrl);
   if (!isPlaying) {
     playNextAudio();
   }
 }
 
-function mob_queueAudio(audioUrl) {
-  audioQueue.push(audioUrl); //add all the audio to the queue
+function mob_queueAudio(audioUrl) { //(mobile) add all the audio to the queue
+  audioQueue.push(audioUrl);
 }
 
-function playNextAudio() {
+function playNextAudio() { //play next audio in the queue
   if ( audioQueue.length === 0) {//once there are no more audio to play
     audio_triggerred = false;
     console.log('\nNo more audio to play');
@@ -280,7 +349,7 @@ function playNextAudio() {
   audio.play();
 }
 
-function end_res() {
+function end_res() { // at the end of the assistant audio response
   asst_speaking = false;
   toggle_btn();
   
@@ -293,4 +362,33 @@ function end_res() {
     audio_triggerred: ${audio_triggerred}
    `);
   return;
-}
+} 
+// #endregion
+
+/* #regionold  tour feature
+tour_btn.addEventListener('click', async () => {
+  try {
+    const cur_tour = await fetch('/tour', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!cur_tour.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const result = await cur_tour.json();
+    tour_text.innerHTML = result.text;
+    if(isMobile){
+      mob_queueAudio(result.value); //queue each new audio chunk
+      mob_compat();
+    }  else {
+      queueAudio(result.value); //autoplay assistant response
+    }
+  } catch (error) {
+    console.error('Error starting tour:', error);
+  }
+});
+// #endregion */
