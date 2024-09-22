@@ -1,6 +1,6 @@
 <!--UPDATE NOTES
-v0.1.0
-new ui
+v0.1.1
+pre loading audio element in conjuction with audio context in script.js to negate play button
 start option
 -->
 <!DOCTYPE html>
@@ -16,7 +16,7 @@ start option
     <section id="index"> <!--start screen-->
         <section class="main">
             <span id ="device"> v 0.8.1</span>
-            <h3>docent.ai</h3>
+            <h3>temp appi</h3>
         </section>
 
         <section id="start" class="footer">
@@ -46,6 +46,7 @@ start option
                     </button>
                 </div>
                 <audio id="audio" class="hide" controls></audio>
+                <audio id="preloaded-audio" preload="auto"></audio> <!-- New preloaded audio element -->
             </div>
             <!--endregion-->
 

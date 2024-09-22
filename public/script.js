@@ -1,6 +1,6 @@
 // App v.1.0
 /*UPDATE NOTES
-  
+resuming audio context state
 */  
 
 // #region setup
@@ -53,9 +53,20 @@ if(isMobile) {
 // #endregion
 
 // #region 1. start/close
-start_btn.addEventListener('click', () => {
+start_btn.addEventListener('click', async () => {
   index.classList.add('hide'); //hide the index
   app.classList.remove('hide'); //show the app
+
+  // #region audio contexts
+  if (!audioContext) { //use the click on start as sufficient interation to initialize audio context
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  if (audioContext.state === 'suspended') { //ensure audio context is resumed
+    await audioContext.resume();
+  }
+  // #endregion
+
   intro();
   show_text(); //show intro message transcription
 });
@@ -278,7 +289,7 @@ function show_tour() {
 // #endregion
 
 // #region audio  functions
-function mob_compat() { //mobile compatibility autoplay circumvent
+/* function mob_compat() { //mobile compatibility autoplay circumvent
   if (!audio_triggerred){
     console.log("mobile device");
     play_sect.classList.remove('hide'); // Show play button section
@@ -290,15 +301,10 @@ function mob_compat() { //mobile compatibility autoplay circumvent
       playNextAudio(); // Ensure that all queued audios play sequent
     }
   };
-}
+} */
 
 function start_audio(x) { //play assistant response
-  if(isMobile){
-    mob_queueAudio(x); //queue each new audio chunk
-    mob_compat();
-  }  else {
-    queueAudio(x); //autoplay assistant response
-  }
+  queueAudio(x); //autoplay assistant response
 }
 
 function stopAudio() {
@@ -317,9 +323,10 @@ function queueAudio(audioUrl) { //add all the audio to the queue
   }
 }
 
+/* mob compact function
 function mob_queueAudio(audioUrl) { //(mobile) add all the audio to the queue
   audioQueue.push(audioUrl);
-}
+} */
 
 function playNextAudio() { //play next audio in the queue
   if ( audioQueue.length === 0) {//once there are no more audio to play
@@ -332,7 +339,8 @@ function playNextAudio() { //play next audio in the queue
   
   isPlaying = true; //set audio to is playing...
   const audioUrl = audioQueue.shift();
-  const audio = new Audio(audioUrl);
+  const audio = document.getElementById('preloaded-audio'); // Use preloaded audio element
+  audio.src = audioUrl;
   currentAudio = audio;
 
   audio.onended = () => { //when one audio chunk ends play the next
@@ -347,7 +355,9 @@ function playNextAudio() { //play next audio in the queue
     playNextAudio();
   };
 
-  audio.play();
+  audio.play().catch((error) => {
+    console.error('Playback failed:', error);
+  });
 }
 
 function end_res() { // at the end of the assistant audio response
@@ -365,31 +375,3 @@ function end_res() { // at the end of the assistant audio response
   return;
 } 
 // #endregion
-
-/* #regionold  tour feature
-tour_btn.addEventListener('click', async () => {
-  try {
-    const cur_tour = await fetch('/tour', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-
-    if (!cur_tour.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const result = await cur_tour.json();
-    tour_text.innerHTML = result.text;
-    if(isMobile){
-      mob_queueAudio(result.value); //queue each new audio chunk
-      mob_compat();
-    }  else {
-      queueAudio(result.value); //autoplay assistant response
-    }
-  } catch (error) {
-    console.error('Error starting tour:', error);
-  }
-});
-// #endregion */
