@@ -1,6 +1,6 @@
 // App v.1.0
 /*UPDATE NOTES
-resuming audio context state
+
 */  
 
 // #region setup
@@ -39,7 +39,7 @@ let currentAudio = null;	// tracks current audio chunk being played
 const isMobile = isMobileDevice(); // Check if the user is on a mobile device at the start
 // #endregion
 
-// #region 1. Check device type
+// #region 1. Check device type and load intro
 function isMobileDevice() { // Check if the user is using a mobile device
   const userAgent = navigator.userAgent.toLowerCase();
   return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent);
@@ -50,24 +50,15 @@ if(isMobile) {
 } else {
   device.innerHTML = "desktop" + " v." + version;
 }
+
+
+intro(); //load intro 
 // #endregion
 
 // #region 1. start/close
-start_btn.addEventListener('click', async () => {
+start_btn.addEventListener('click', () => {
   index.classList.add('hide'); //hide the index
   app.classList.remove('hide'); //show the app
-
-  // #region audio contexts
-  if (!audioContext) { //use the click on start as sufficient interation to initialize audio context
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  if (audioContext.state === 'suspended') { //ensure audio context is resumed
-    await audioContext.resume();
-  }
-  // #endregion
-
-  intro();
   show_text(); //show intro message transcription
 });
 
@@ -94,7 +85,7 @@ async function intro(){
     }
     const intro_res = await intro.json();
     responseElement.innerHTML = intro_res.text; // load intro text
-    start_audio(intro_res.value); //start the intro message
+    start_x(intro_res.value); //start the intro message
   } catch (error) {
     console.error('Error starting intro:', error);
   };
@@ -289,23 +280,34 @@ function show_tour() {
 // #endregion
 
 // #region audio  functions
-/* function mob_compat() { //mobile compatibility autoplay circumvent
+function mob_compat() { //mobile compatibility autoplay circumvent
   if (!audio_triggerred){
     console.log("mobile device");
-    play_sect.classList.remove('hide'); // Show play button section
-    reg_sec.classList.add('hide');  // Hide regular button section 
-    playButton.onclick = () => {
+   // play_sect.classList.remove('hide'); // Show play button section
+   // reg_sec.classList.add('hide');  // Hide regular button section 
+    start_btn.onclick = () => {
+      start_btn.classList.add('active');
       audio_triggerred = true;
       play_sect.classList.add('hide'); // Hide play button section
       reg_sec.classList.remove('hide'); // Show regular button section
       playNextAudio(); // Ensure that all queued audios play sequent
     }
   };
-} */
+}
 
-function start_audio(x) { //play assistant response
+function start_x(x) { //play assistant response
+  if(isMobile){
+    mob_queueAudio(x); //queue each new audio chunk
+    mob_compat();
+  } else {
+    queueAudio(x); //autoplay assistant response
+  }
+}
+
+function start_audio(x) { 
   queueAudio(x); //autoplay assistant response
 }
+
 
 function stopAudio() {
   if (currentAudio) {
@@ -323,13 +325,11 @@ function queueAudio(audioUrl) { //add all the audio to the queue
   }
 }
 
-/* mob compact function
 function mob_queueAudio(audioUrl) { //(mobile) add all the audio to the queue
   audioQueue.push(audioUrl);
-} */
+}
 
 function playNextAudio() { //play next audio in the queue
-  console.log('playing next audio...');
   if ( audioQueue.length === 0) {//once there are no more audio to play
     audio_triggerred = false;
     console.log('\nNo more audio to play');
@@ -340,28 +340,7 @@ function playNextAudio() { //play next audio in the queue
   
   isPlaying = true; //set audio to is playing...
   const audioUrl = audioQueue.shift();
-  const audio = document.getElementById('preloaded-audio'); // Use preloaded audio element
-  
-   // Ensure the audio context is resumed before playing
-   if (audioContext.state === 'suspended') {
-    audioContext.resume().then(() => {
-      console.log('AudioContext resumed.');
-    }).catch((error) => {
-      console.error('Error resuming AudioContext:', error);
-    });
-  }
-
-  audio.src = audioUrl; // Set the audio source
-
-  // Add the canplaythrough listener to ensure the audio is fully loaded before playing
-  audio.addEventListener('canplaythrough', () => {
-    console.log('Audio is ready to play.');
-    audio.play().catch((error) => {
-      console.error('Playback failed:', error); // Log error details
-      console.log(`AudioContext state: ${audioContext.state}`);
-    });
-  });
-
+  const audio = new Audio(audioUrl);
   currentAudio = audio;
 
   audio.onended = () => { //when one audio chunk ends play the next
@@ -376,9 +355,7 @@ function playNextAudio() { //play next audio in the queue
     playNextAudio();
   };
 
-  audio.play().catch((error) => {
-    console.error('Playback failed:', error);
-  });
+  audio.play();
 }
 
 function end_res() { // at the end of the assistant audio response
