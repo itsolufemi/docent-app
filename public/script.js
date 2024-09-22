@@ -1,6 +1,6 @@
 // App v.1.0
 /*UPDATE NOTES
-using the start button to initilize audio context negates the need for the play button on mobile for assistant audio response  
+audio context init didnt work to negate play button on mobile
 */  
 
 // #region setup
@@ -298,7 +298,12 @@ function mob_compat() { //mobile compatibility autoplay circumvent
 }
 
 function start_audio(x) { //play assistant response
-  queueAudio(x); //autoplay assistant response
+  if(isMobile){
+    mob_queueAudio(x); //queue each new audio chunk
+    mob_compat();
+  }  else {
+    queueAudio(x); //autoplay assistant response
+  }
 }
 
 function stopAudio() {
