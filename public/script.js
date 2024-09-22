@@ -329,6 +329,7 @@ function mob_queueAudio(audioUrl) { //(mobile) add all the audio to the queue
 } */
 
 function playNextAudio() { //play next audio in the queue
+  console.log('playing next audio...');
   if ( audioQueue.length === 0) {//once there are no more audio to play
     audio_triggerred = false;
     console.log('\nNo more audio to play');
@@ -340,7 +341,27 @@ function playNextAudio() { //play next audio in the queue
   isPlaying = true; //set audio to is playing...
   const audioUrl = audioQueue.shift();
   const audio = document.getElementById('preloaded-audio'); // Use preloaded audio element
-  audio.src = audioUrl;
+  
+   // Ensure the audio context is resumed before playing
+   if (audioContext.state === 'suspended') {
+    audioContext.resume().then(() => {
+      console.log('AudioContext resumed.');
+    }).catch((error) => {
+      console.error('Error resuming AudioContext:', error);
+    });
+  }
+
+  audio.src = audioUrl; // Set the audio source
+
+  // Add the canplaythrough listener to ensure the audio is fully loaded before playing
+  audio.addEventListener('canplaythrough', () => {
+    console.log('Audio is ready to play.');
+    audio.play().catch((error) => {
+      console.error('Playback failed:', error); // Log error details
+      console.log(`AudioContext state: ${audioContext.state}`);
+    });
+  });
+
   currentAudio = audio;
 
   audio.onended = () => { //when one audio chunk ends play the next
