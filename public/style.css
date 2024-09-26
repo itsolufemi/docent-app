@@ -8,7 +8,7 @@ body {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  height: 100vh;
+  height: 90vh;
   width: 100%;
 }
 
@@ -95,7 +95,7 @@ nav{
   align-items: center; /* Centers vertically if needed */
 }
 
-.footer button {
+.footer button{
   width: 50px;
   height: 50px;
 }

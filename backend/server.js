@@ -1,6 +1,6 @@
 //App v.1.0
 /*UPDATE NOTES
-retriving the assistant and creating the thread at the beginning of the code
+deleting thread with close button
 */
 
 // #region Imports
@@ -35,6 +35,7 @@ async function create_thread_and_assistant() { //create the assistant and thread
   assistant = await openai.beta.assistants.retrieve("asst_e3phU73yAZIBbIdsmuRYsCHS"); //Retrieve the assistant at the top
   const thread = await openai.beta.threads.create(); //create overall thread
   threadId = thread.id; //set the threadId
+  console.log(threadId);
 }
 
 create_thread_and_assistant();
@@ -318,6 +319,21 @@ const getAssistantResponse = async (inputText, res) => {
       throw new Error('Error generating TTS');
     }
   };
+
+// Endpoint to handle app close
+app.post('/close', async (req, res) => {
+  console.log('closing app ...');
+  try {
+    const response = await openai.beta.threads.del(threadId);
+    threadId = null; //reset the threadId
+    console.log(response);
+    await create_thread_and_assistant(); // wait to retrive the assistand and create new thread
+    res.status(200).send('app closed'); //reponsd to the client after all is done
+  } catch (error) {
+    console.error('Error closing app:', error);
+    res.status(500).send('Error closing app');
+  }
+});
 
 // Start the server
 app.listen(port, () => {

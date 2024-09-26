@@ -1,6 +1,6 @@
 // App v.1.0
 /*UPDATE NOTES
-audio context init didnt work to negate play button on mobile
+end conversation with close button and fix intro play button bug on desktop
 */  
 
 // #region setup
@@ -52,29 +52,10 @@ if(isMobile) {
 }
 // #endregion
 
-// #region 1. start/close
-start_btn.addEventListener('click', () => {
-  index.classList.add('hide'); //hide the index
-  app.classList.remove('hide'); //show the app
-
-  if (!audioContext) { //use the click on start as sufficient interation to initialize audio context
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-
-  intro();
-  show_text(); //show intro message transcription
-});
-
-close_btn.addEventListener('click', () => {
-  app.classList.add('hide'); //hide the app
-  index.classList.remove('hide'); //show the index
-});
-// #endregion
-
-// #region 3. intro function
+// #region 2. intro function
+intro(); //load intro 
 async function intro(){
   console.log("introduction");
-  responseElement.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>';
   try {
     const intro = await fetch('/introduction', {
       method: 'POST',
@@ -88,11 +69,25 @@ async function intro(){
     }
     const intro_res = await intro.json();
     responseElement.innerHTML = intro_res.text; // load intro text
-    start_audio(intro_res.value); //start the intro message
+    start_btn.disabled = false; //renable start button
+    start_btn.innerHTML = '<i class="fa-solid fa-circle-play" style="font-size: 45px;"></i>'; //change start button icon to play
+    start_audio(intro_res.value, 'start'); //play the intro message
   } catch (error) {
     console.error('Error starting intro:', error);
   };
 }
+// #endregion
+
+// #region 3. start/close
+start_btn.addEventListener('click', () => {
+  index.classList.add('hide'); //hide the index
+  app.classList.remove('hide'); //show the app
+});
+
+close_btn.addEventListener('click', () => {
+  app.classList.add('hide'); //hide the app
+  index.classList.remove('hide'); //show the index
+});
 // #endregion
 
 // #region 4. mic button functions
@@ -103,13 +98,13 @@ recordButton.addEventListener('click', () => {
     recordButton.classList.remove('active');
 
     show_text(); //show the transcripts panel
-    responseElement.innerHTML = '<i class="fas fa-microphone"></i>';
     
     recorder.exportWAV(async (blob) => {
       const audioUrl = URL.createObjectURL(blob);
       audioElement.src = audioUrl;
 
-      responseElement.innerHTML = ''; // Clear the previous response
+      responseElement.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>'; // Clear the previous response
+      
       audioQueue = []; // Clear the audio queue before the next question
 
       const formData = new FormData();
@@ -140,11 +135,11 @@ recordButton.addEventListener('click', () => {
           for (let line of lines) {
             let parsed = JSON.parse(line);
             if (parsed.type === 'transcription') {
-              responseElement.innerHTML = `<strong>Transcription:</strong> ${parsed.value.replace(/\n/g, '<br>')}<br>`;
+              responseElement.innerHTML = `<strong>Transcription:</strong> ${parsed.value.replace(/\n/g, '<br>')}<br> <br>`;
             }
             if (parsed.type === 'audio') {
               responseElement.innerHTML += parsed.text.replace(/\n/g, '<br>');
-              start_audio(parsed.value);
+              start_audio(parsed.value, 'play');
             }
             if (parsed.type === 'cancelled') {
               responseElement.innerHTML = 'Cancelled.';
@@ -187,28 +182,7 @@ function toggle_btn() {
 }
 
 pauseButton.addEventListener('click', async () => {
-  asst_speaking = false; // Set the speaking flag to false to stop playback
-  audioQueue = []; // Clear the audio queue
-  audio_triggerred = false; // Reset audio trigger flag
-  stopAudio(); // Stop the current audio
-
-  try {
-    const response = await fetch('/cancel-run', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({})
-    });
-
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const result = await response.json();
-    console.log('Cancel result:', result);
-  } catch (error) {
-    console.error('Error cancelling run:', error);
-  }
+  pause_function();
 });
 // #endregion
 
@@ -233,9 +207,13 @@ tour_btn.addEventListener('click', async () => { //the tour button
         throw new Error('Network response was not ok');
       }
       const tour_res = await cur_tour.json();
+
+      asst_speaking = true; // The assistant is now speaking, we are only allowed to pause
+      toggle_btn(); // Show pause button and hide record button
+
       tour_text.innerHTML = tour_res.text;
       show_tour(); //just in case user is viewing another screen, it shows when the tour is ready to play
-      start_audio(tour_res.value); //start playing the tour message
+      start_audio(tour_res.value, 'play'); //start playing the tour message
     } catch (error) {
       console.error('Error starting tour:', error);
     }
@@ -283,26 +261,43 @@ function show_tour() {
 // #endregion
 
 // #region audio  functions
-function mob_compat() { //mobile compatibility autoplay circumvent
-  if (!audio_triggerred){
-    console.log("mobile device");
-    play_sect.classList.remove('hide'); // Show play button section
-    reg_sec.classList.add('hide');  // Hide regular button section 
-    playButton.onclick = () => {
-      audio_triggerred = true;
-      play_sect.classList.add('hide'); // Hide play button section
-      reg_sec.classList.remove('hide'); // Show regular button section
-      playNextAudio(); // Ensure that all queued audios play sequent
+function start_audio(x, y) { //play assistant response
+  if (y == 'start'){ //defaulting to mobile function even on desktop for introductory message
+    mob_queueAudio(x); //queue each new audio chunk
+    mob_compat(y);
+  }
+  else { // for normal converstation use normal audio methods  
+    if(isMobile){
+      mob_queueAudio(x); //queue each new audio chunk
+      mob_compat(y);
+    } else {
+      queueAudio(x); //autoplay assistant response
     }
-  };
+  }
 }
 
-function start_audio(x) { //play assistant response
-  if(isMobile){
-    mob_queueAudio(x); //queue each new audio chunk
-    mob_compat();
-  }  else {
-    queueAudio(x); //autoplay assistant response
+function mob_compat(btn_name) { //mobile compatibility autoplay circumvent
+  if(btn_name == 'play'){ //for using the app play button
+    if (!audio_triggerred){
+      console.log("mobile device");
+      play_sect.classList.remove('hide'); // Show play button section
+      reg_sec.classList.add('hide');  // Hide regular button section 
+      playButton.onclick = () => {
+        audio_triggerred = true;
+        play_sect.classList.add('hide'); // Hide play button section
+        reg_sec.classList.remove('hide'); // Show regular button section
+        playNextAudio(); // Ensure that all queued audios play sequent
+      }
+    }
+  } else if(btn_name == 'start'){ //for using the index start button
+    if (!audio_triggerred){
+      console.log("mobile device");
+      start_btn.onclick = () => {
+        audio_triggerred = true;
+        show_text(); //show intro message transcription
+        playNextAudio(); // Ensure that all queued audios play sequent
+      }
+    };
   }
 }
 
@@ -369,4 +364,63 @@ function end_res() { // at the end of the assistant audio response
    `);
   return;
 } 
+
+async function pause_function() {
+  console.log('pausing ...')
+  asst_speaking = false; // Set the speaking flag to false to stop playback
+  audioQueue = []; // Clear the audio queue
+  audio_triggerred = false; // Reset audio trigger flag
+  stopAudio(); // Stop the current audio
+
+  try {
+    const response = await fetch('/cancel-run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const result = await response.json();
+    console.log('Cancel result:', result);
+  } catch (error) {
+    console.error('Error cancelling run:', error);
+  }
+}
+// #endregion
+
+// #region close app
+close_btn.addEventListener('click', async() => {
+  if (asst_speaking) { //assistant is currently speaking, pause
+    pause_function(); //pause the assistant response
+    console.log('assistant paused');
+  }
+
+  try {
+    console.log('sent close request to server');
+    const response = await fetch('/close', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    } else {
+      const result = await response.text();
+      console.log('good server response: ', result);
+      window.location.reload();
+    }
+  } catch (error) {
+    console.error('Error closing app:', error);
+  }
+
+  app.classList.add('hide'); //hide the app
+  index.classList.remove('hide'); //show the index
+});
 // #endregion
