@@ -1,6 +1,6 @@
-// App v.1.0
+// App v.1.0.1
 /*UPDATE NOTES
-end conversation with close button and fix intro play button bug on desktop
+new pause audio queue continue session instead of clearing audio, should minimize the use of play button 
 */  
 
 // #region setup
@@ -34,6 +34,7 @@ let recorder;
 let audio_triggerred = false;
 let isPlaying = false;
 let audioQueue = [];
+let pausedQueue = [];
 let asst_speaking = false;
 let currentAudio = null;	// tracks current audio chunk being played
 const isMobile = isMobileDevice(); // Check if the user is on a mobile device at the start
@@ -105,7 +106,7 @@ recordButton.addEventListener('click', () => {
 
       responseElement.innerHTML = '<i class="fa-solid fa-hourglass-start"></i>'; // Clear the previous response
       
-      audioQueue = []; // Clear the audio queue before the next question
+      //audioQueue = []; // Clear the audio queue before the next question
 
       const formData = new FormData();
       formData.append('audio', blob, 'audio.wav');
@@ -126,7 +127,7 @@ recordButton.addEventListener('click', () => {
         while (!(result = await reader.read()).done) {
           if (!asst_speaking) { // Check if the assistant is speaking before processing more audio
             console.log("Cancelling further audio processing.");
-            audioQueue = []; // Clear the audio queue if the assistant is no longer speaking
+            //audioQueue = []; // Clear the audio queue if the assistant is no longer speaking
             break; // Exit the loop if the assistant is no longer speaking
           }
 
@@ -267,12 +268,12 @@ function start_audio(x, y) { //play assistant response
     mob_compat(y);
   }
   else { // for normal converstation use normal audio methods  
-    if(isMobile){
+   /* if(isMobile){
       mob_queueAudio(x); //queue each new audio chunk
       mob_compat(y);
-    } else {
+    } else {*/
       queueAudio(x); //autoplay assistant response
-    }
+  //  }
   }
 }
 
@@ -368,7 +369,9 @@ function end_res() { // at the end of the assistant audio response
 async function pause_function() {
   console.log('pausing ...')
   asst_speaking = false; // Set the speaking flag to false to stop playback
-  audioQueue = []; // Clear the audio queue
+  //audioQueue = []; // Clear the audio queue
+  audioQueue.shift() // Remove the current audio from the queue
+  pausedQueue = []; // Clear the paused queue
   audio_triggerred = false; // Reset audio trigger flag
   stopAudio(); // Stop the current audio
 
